@@ -1,2 +1,4 @@
-# 6210Assignement5
-This is the repository for 6210 Assignment 5.
+# BINF6210-Assignement5
+This is the repository for BINF6210 Assignment 5.
+
+I created a branch called Developments on Nov 21.
