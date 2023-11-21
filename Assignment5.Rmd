@@ -1,0 +1,43 @@
+---
+title: "Assignment 5"
+author: "Qingyuan Pei"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+
+## Description of Data Set
+
+
+## Code Section 1 - – Data Acquisition, Exploration, Filtering, and Quality Control
+
+```{r, echo=FALSE}
+
+```
+
+## Main Software Tools Description
+
+
+## Code Section 2 - Main Analysis
+
+```{r}
+
+```
+
+
+## Results and Discussion
+
+
+## Reflection
+
+
+## Acknowledgements
+
+
+## References
