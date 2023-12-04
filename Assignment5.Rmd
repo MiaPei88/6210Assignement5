@@ -9,35 +9,125 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Introduction
+### Introduction
 
+Molecular Phylogenetics and Congruence
 
-## Description of Data Set
+### Description of Data Set
 
+The data set I choose for this project is the DNA sequences of COI gene and CytB gene in *Acipenser* from NCBI, and this data set is obtained on December 3, 2023. COI and CytB genes are widely used as phylogenetic markers of fish(Ivanova et al., 2007; Li et al., 2018). Here I use rentrez package and functions in Entrez_Functions.R, a course material, to obtain the data in this R script. I also limited the sequence lengths of the two genes to exclude whole genome sequences: the range of sequence length is 500-700 for COI gene and is 600-1200 for CytB gene. 
 
-## Code Section 1 - – Data Acquisition, Exploration, Filtering, and Quality Control
+### Code Section 1 - – Data Acquisition, Exploration, Filtering, and Quality Control
 
-```{r, echo=FALSE}
-
+Loading packages in this project.
+```{r, message = FALSE}
+#tidyverse version: 2.0.0
+library(tidyverse)
+library(rentrez)
+library(Biostrings)
+library(ggplot2)
 ```
 
-## Main Software Tools Description
+Search for the hits of COI and CytB gene of *Acipenser*.
+```{r}
+NCBI_search <- entrez_search(
+  db = "nuccore", 
+  term = "Acipenser[ORGN] AND COI[Gene] AND 500:700[SLEN]", 
+  use_history = T
+  )
+NCBI_search
+
+NCBI_search1 <- entrez_search(
+  db = "nuccore", 
+  term = "Acipenser[ORGN] AND CytB[Gene] AND 600:1200[SLEN]", 
+  use_history = T
+  )
+NCBI_search1
+```
+Using functions in Entrez_Functions.R to obtain data set from NCBI.
+```{r, results = "hide"}
+# Save the functions wrote in the R script to the current environment
+source("Entrez_Functions.R")
+# Fetch fasta files from NCBI
+FetchFastaFiles(searchTerm = "Acipenser[ORGN] AND COI[Gene] AND 500:700[SLEN]", 
+                seqsPerFile = 100, fastaFileName = "Acipenser_fetch_1.fasta")
+FetchFastaFiles(searchTerm = "Acipenser[ORGN] AND CytB[Gene] AND 600:1200[SLEN]", 
+                seqsPerFile = 100, fastaFileName = "Acipenser_fetch_2.fasta")
+# Merge all fasta files and store it as a data frame 
+dfNCBI_COI <- MergeFastaFiles(filePattern = "Acipenser_fetch_1.fasta.*")
+dfNCBI_CytB <- MergeFastaFiles(filePattern = "Acipenser_fetch_2.fasta.*")
+
+# Add two new columns to include the species name and sequence length of each row,
+# and filter out whole genome sequences and sequences with more than 5% of Ns.
+Filter1 <- function(df) {
+  filtered1 <- df %>%
+    mutate(Species_Name = word(Title, 2L, 3L)) %>%
+    mutate(Sequence_Length = nchar(Sequence)) %>%
+    mutate(Gene_Type = word(str_extract(Title, "(?i)partial|complete"))) %>%
+    filter(Gene_Type == "partial") %>%
+    filter(str_count(Sequence, "N") <= (0.05 * Sequence_Length))
+  return(filtered1)
+}
+dfCOI <- Filter1(dfNCBI_COI) 
+dfCytB <- Filter1(dfNCBI_CytB) 
+```
+
+Draw a histogram to see the distribution of COI sequence lengths to further decide the following data filtering steps.
+```{r, fig.align = 'center', fig.cap = '**Figure 1**: '}
+hist((dfCOI$Sequence_Length), 
+     xlab = "Sequence Length", 
+     ylab =  "Frequency", 
+     main = "Distribution of COI Sequence Lengths")
+```
+
+Draw a histogram to see the distribution of CytB sequence lengths to further decide the following data filtering steps.
+```{r, fig.align = 'center', fig.cap = '**Figure 2**: '}
+hist((dfCytB$Sequence_Length), 
+     xlab = "Sequence Length", 
+     ylab =  "Frequency", 
+     main = "Distribution of CytB Sequence Lengths")
+```
+
+Filter out sequences that their length are not the majority.
+```{r}
+dfCOI_filtered <- dfCOI %>%
+  #remove sequences with length shorter than 600
+  filter(Sequence_Length >= 600)
+
+dfCytB_filtered <- dfCytB %>%
+  #remove sequences that are longer and shorter than the median legnth +/- 100
+  filter(Sequence_Length >= median((Sequence_Length) - 100) & 
+           Sequence_Length <= median((Sequence_Length) + 100))
+```
+
+Check if the number of species between 10 to 50.
+```{r}
+length(unique(dfCOI$Species_Name))
+length(unique(dfCytB$Species_Name))
+```
+
+### Main Software Tools Description
 
 
-## Code Section 2 - Main Analysis
+### Code Section 2 - Main Analysis
 
 ```{r}
 
 ```
 
 
-## Results and Discussion
+### Results and Discussion
 
 
-## Reflection
+### Reflection
 
 
-## Acknowledgements
+### Acknowledgements
 
 
-## References
+### References
+
+
+Ivanova, N. V., Zemlak, T. S., Hanner, R. H., & Hebert, P. D. (2007). Universal primer cocktails for fish DNA barcoding. *Molecular Ecology Notes*, 7(4), 544-548.
+
+Li, X., Shen, X., Chen, X., Xiang, D., Murphy, R. W., & Shen, Y. (2018). Detection of potential problematic Cytb gene sequences of fishes in GenBank. *Frontiers in genetics*, 9, 30.
