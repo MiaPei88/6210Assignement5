@@ -27,6 +27,8 @@ library(Biostrings)
 library(ggplot2)
 library(DECIPHER)
 library(ape)
+library(dendextend)
+library(phangorn)
 ```
 
 Search for the hits of COI and CytB gene of *Acipenser*.
@@ -106,127 +108,186 @@ Check if the number of species between 10 to 50.
 ```{r}
 length(unique(dfCOI$Species_Name))
 length(unique(dfCytB$Species_Name))
-intersect(dfCOI$Species_Name,dfCytB$Species_Name)
 ```
 
-
+Here I write a function for DNA sequence alignment and use it for COI gene sequences.
 ```{r, results='hide'}
-AlignmentTest <- function(filtered_df) {
+# Function for sequence alignment
+Alignment <- function(filtered_df) {
   df <- as.data.frame(filtered_df)
   df$nucleotides <- DNAStringSet(df$Sequence)
+  # Assign the second word of the species name and the number in the title as 
+  # the name of each nucleotides sequence to better see the alignment result.
   df$Alignment_id <- paste(word(df$Species_Name, 2L), 
-                                  word(df$Title, 1L),
-                                  sep = " ")
+                           word(df$Title, 1L),
+                           sep = " ")
   names(df$nucleotides) <- df$Alignment_id
-  alignment.test <- AlignSeqs(df$nucleotides)
-  return(alignment.test)
+  alignment <- AlignSeqs(df$nucleotides)
+  return(dnaalignment)
 }
 
-dfCOI.alignment.test <- AlignmentTest(dfCOI_filtered)
+dfCOI.alignment.test <- Alignment(dfCOI_filtered)
 BrowseSeqs(dfCOI.alignment.test)
 ```
 
+After seeing the alignment result, I decided to delete the sequences that are highly possible to be outliers as follows:
 ON097839.1, MT455724.1, MK903722.1, MK903723.1, MK903724.1, MK903725.1, MK903726.1, HM902200.1, MF122058.1, MF122059.1, KC578836.1, KC578837.1, KF929572.1, KF558304.1, KC500133.1, KC578827.1, EU523886.1, EU523878.1, KM286430.1, JQ623904.1, JQ623905.1, JQ623906.1, KX145481.1, KX145032.1, KC500105.1 
 
-
+Here I filtered out the sequences and then write another function for aligning sequences by their amino acid translation, in order to filter outliers that might be missed in the last step.
 ```{r, results='hide'}
 dfCOI_filtered1 <- dfCOI_filtered %>%
-  filter(
-    !grepl('ON097839.1|MT455724.1|MK903722.1|MK903723.1|MK903724.1|MK903725.1|MK903726.1|HM902200.1|MF122058.1|MF122059.1|KC578836.1|KC578837.1|KF929572.1|KF558304.1|KC500133.1|KC578827.1|EU523886.1|EU523878.1|KM286430.1|JQ623904.1|JQ623905.1|JQ623906.1|KX145481.1|KX145032.1|KC500105.1', Title))
+  filter(!grepl('ON097839.1|MT455724.1|MK903722.1|MK903723.1|MK903724.1|MK903725.1|MK903726.1|HM902200.1|MF122058.1|MF122059.1|KC578836.1|KC578837.1|KF929572.1|KF558304.1|KC500133.1|KC578827.1|EU523886.1|EU523878.1|KM286430.1|JQ623904.1|JQ623905.1|JQ623906.1|KX145481.1|KX145032.1|KC500105.1', Title))
 
-AlignTranslationTest <- function(filtered_df) {
+AlignTranslation <- function(filtered_df) {
   df <- as.data.frame(filtered_df)
   df$nucleotides <- DNAStringSet(df$Sequence)
   df$Alignment_id <- paste(word(df$Species_Name, 2L), 
                                   word(df$Title, 1L),
                                   sep = " ")
   names(df$nucleotides) <- df$Alignment_id
-  align.translation.test <- AlignTranslation(df$nucleotides, 
+  align.translation <- AlignTranslation(df$nucleotides, 
                                              readingFrame=NA,
+                                             # AAStringSet: Amino Acid StringSet
                                              type="AAStringSet")
-  return(align.translation.test)
+  return(align.translation)
 }
 
-dfCOI.translation <- AlignTranslationTest(dfCOI_filtered1)
-
+dfCOI.translation <- AlignTranslation(dfCOI_filtered1)
 BrowseSeqs(dfCOI.translation)
 ```
 
-ON097800.1, ON097762.1, ON097679.1, MT455123.1, KX145047.1, MG648396.1, MG648380.1, MG648371.1, MG648367.1, MG648366.1, KX145047.1, GQ328798.1, GQ328790.1
+After seeing the Amino Acid alignment, I decide to delete sequences that are clearly different comparing to the majority of the species sequences:
+ON097800.1, ON097762.1, ON097679.1, MT455123.1, KX145047.1, MG648396.1, MG648380.1, MG648371.1, MG648367.1, MG648366.1, KX145047.1, GQ328798.1, GQ328790.1, HQ960593.1, KC500103.1, FJ809729.1, FJ809728.1, FJ809727.1, FJ809726.1, FJ809725.1, FJ809722.1, HQ960593.1, HQ960592.1, HQ960591.1, HQ960590.1
 
+Here I filter out the sequences then write another function for making a dendrogram to see the quality of data filtering.
 ```{r, results='hide'}
-dfCOI_final <- dfCOI_filtered1 %>%
+dfCOI_filtered2 <- dfCOI_filtered1 %>%
   filter(
-    !grepl('ON097800.1|ON097762.1|ON097679.1|MT455123.1|KX145047.1|MG648396.1|MG648380.1|MG648371.1|MG648367.1|MG648366.1|KX145047.1|GQ328798.1|GQ328790.1', Title))
-
-DendrogramCheck <- function(filtered_df, clustering_method, clustering_threshold) {
-  df <- as.data.frame(filtered_df)
-  df$nucleotides <- DNAStringSet(df$Sequence)
-  df$Alignment_id <- paste(word(df$Title, 1L))
-  names(df$nucleotides) <- df$Alignment_id
-  df <- AlignSeqs(df$nucleotides)
-  dnaBin <- as.DNAbin(df)
-  distanceMatrix <- dist.dna(dnaBin, model = "TN93", 
-                           as.matrix = TRUE, pairwise.deletion = TRUE)
-  clusters <- DECIPHER::TreeLine(myDistMatrix = distanceMatrix,
-                                      method = clustering_method,
-                                      cutoff = clustering_threshold,
-                                      showPlot = TRUE,
-                                      type = "both",
-                                      verbose = TRUE)
-  return(clusters)
-}
-
-clusters.COI <- DendrogramCheck(dfCOI_final, "NJ", 0.012)
+    !grepl('ON097800.1|ON097762.1|ON097679.1|MT455123.1|KX145047.1|MG648396.1|MG648380.1|MG648371.1|MG648367.1|MG648366.1|KX145047.1|GQ328798.1|GQ328790.1|HQ960593.1|KC500103.1|FJ809729.1|FJ809728.1|FJ809727.1|FJ809726.1|FJ809725.1|FJ809722.1|HQ960593.1|HQ960592.1|HQ960591.1|HQ960590.1', Title))
 ```
 
-
+Check the number of species for COI gene after all the data filtering steps.
 ```{r}
-unique(dfCOI_final$Species_Name)
+unique(dfCOI_filtered2$Species_Name)
 ```
 
-
+DNA sequence alignment for CytB gene sequences.
 ```{r, results='hide'}
-dfCytB.alignment.test <- AlignmentTest(dfCytB_filtered)
+dfCytB.alignment.test <- Alignment(dfCytB_filtered)
 BrowseSeqs(dfCytB.alignment.test)
 ```
 
-FJ974042.1, AJ249693.1, AJ249694.1, FJ974041.
+After seeing the alignment result, I decided to delete the sequences in CytB group that are highly possible to be outliers: FJ974042.1, AJ249693.1, AJ249694.1, FJ974041.
 
+Here I filtered out the sequences and then use the function "AlignTranslationTest" I write for aligning sequences by their amino acid translation, in order to filter outliers that might be missed in the last step.
 ```{r, results='hide'}
 dfCytB_filtered1 <- dfCytB_filtered %>%
-  filter(
-    !grepl('FJ974042.1|AJ249693.1|AJ249694.1|FJ974041.', Title))
+  filter(!grepl('FJ974042.1|AJ249693.1|AJ249694.1|FJ974041.1', Title))
 
-dfCytB.translation <- AlignTranslationTest(dfCytB_filtered1)
+dfCytB.translation <- AlignTranslationt(dfCytB_filtered1)
 
 BrowseSeqs(dfCytB.translation)
 ```
 
-FJ974040.1, AJ277594.1, FJ974043.1
+After seeing the result of amino acid alignment of CytB group, I decide to delete the sequences that are apparently outliers comparing to the majority of the species: FJ974040.1, AJ277594.1, FJ974043.1
 
+Here I filter out the sequences and check the number of species for CytB gene
 ```{r, results='hide'}
-dfCytB_final <- dfCytB_filtered1 %>%
-  filter(
-    !grepl('FJ974040.1|AJ277594.1|FJ974043.1', Title))
+dfCytB_filtered2 <- dfCytB_filtered1 %>%
+  filter(!grepl('FJ974040.1|AJ277594.1|FJ974043.1', Title))
 
-clusters.CytB <- DendrogramCheck(dfCytB_final, "NJ", 0.015)
+unique(dfCytB_filtered2$Species_Name)
 ```
 
-
+After all the data filtering steps I need to see the common species between COI and CytB groups and filter out other species that are not shared by these two marker genes.
 ```{r}
-unique(dfCytB_final$Species_Name)
+common_species <- intersect(dfCOI_filtered2$Species_Name, dfCytB_filtered2$Species_Name)
 ```
 
+Filter out other species that are not shared by both COI and CytB group.
+```{r}
+dfCOI_final <- dfCOI_filtered2 %>%
+  filter(Species_Name %in% common_species)
+
+dfCytB_final <- dfCytB_filtered2 %>%
+  filter(Species_Name %in% common_species)
+```
+
+I write and use the function "DendrogramCheck" for making dendrograms to see the quality of data filtering for COI and CytB gene sequences.
+```{r}
+DendrogramCheck <- function(filtered_df, clustering_method, clustering_threshold) {
+  df <- as.data.frame(filtered_df)
+  df$nucleotides <- DNAStringSet(df$Sequence)
+  # I only used the first to letters of the second word in the column Species_Name
+  # and the number of each sequence which is the first word in the column Title
+  df$Alignment_id <- paste(substr(word(df$Species_Name, 2L),1,2), word(df$Title, 1L), sep = " ")
+  names(df$nucleotides) <- df$Alignment_id
+  df <- AlignSeqs(df$nucleotides)
+  dnaBin <- as.DNAbin(df)
+  # I use TN93 here as it is reliable for both COI and CytB gene
+  distanceMatrix <- dist.dna(dnaBin, model = "TN93", 
+                           as.matrix = TRUE, pairwise.deletion = TRUE)
+  clusters <- DECIPHER::TreeLine(myDistMatrix = distanceMatrix,
+                                 method = clustering_method,
+                                 cutoff = clustering_threshold,
+                                 collapse = -1,
+                                 showPlot = TRUE,
+                                 type = "both",
+                                 verbose = FALSE)
+  return(clusters)
+}
+```
+
+```{r, fig.align = 'center', fig.cap = '**Figure 3**: Phylogenetic tree of all sequences belongs to COI gene marker'}
+clusters.COI <- DendrogramCheck(dfCOI_final, "NJ", 0.016)
+```
+
+```{r, fig.align = 'center', fig.cap = '**Figure 4**: Phylogenetic tree of all sequences belongs to CytB gene marker'}
+clusters.CytB <- DendrogramCheck(dfCytB_final, "NJ", 0.016)
+```
 
 ### Main Software Tools Description
 
 
 ### Code Section 2 - Main Analysis
 
+I write a function to find one representative sequence for each species of the two marker genes.
 ```{r}
-
+FindRepSeq <- function(dendrogram, df_final) {
+  # Transfer the dendrograms into phylos
+  tree <- as.phylo(dendrogram)
+  # Create tibbles showing the information of the trees
+  treetibble <- tidytree::as_tibble(tree)
+  treetibble$species <- paste(word(treetibble$label, 1L))
+  # Find the median of the parent node of each species
+  parent.median <- treetibble %>%
+    group_by(species) %>%
+    summarize(Median = round(median(parent)))
+  # Choose one sequence with the median parent node number to be the representative
+  rep.sequences <- treetibble %>%
+    group_by(species) %>%
+    filter(species != "NA") %>%
+    inner_join(parent.median, by = "species") %>%
+    filter(parent == Median) %>%
+    sample_n(1)
+  # Save the column label in rep.sequences into a new vector
+  rep_sequences <- rep.sequences$label
+  represent <- df_final %>%
+    # Create a new column in the df_final that match the pattern off rep.sequences
+    mutate(id = paste(substr(word(Species_Name, 2L),1,2), 
+                      word(Title, 1L), sep = " ")) %>%
+    # Filter out sequences that do not match with elements in rep_sequences
+    filter(id %in% rep_sequences)
+  return(represent)
+}
 ```
+
+Find the representative sequences of species both exist in COI and CytB group and save them into new data frames for the next step.
+```{r}
+COI_represent <- FindRepSeq(clusters.COI[[2]],dfCOI_final)
+CytB_represent <- FindRepSeq(clusters.CytB[[2]],dfCytB_final)
+```
+
 
 
 ### Results and Discussion
@@ -243,3 +304,7 @@ unique(dfCytB_final$Species_Name)
 Ivanova, N. V., Zemlak, T. S., Hanner, R. H., & Hebert, P. D. (2007). Universal primer cocktails for fish DNA barcoding. *Molecular Ecology Notes*, 7(4), 544-548.
 
 Li, X., Shen, X., Chen, X., Xiang, D., Murphy, R. W., & Shen, Y. (2018). Detection of potential problematic Cytb gene sequences of fishes in GenBank. *Frontiers in genetics*, 9, 30.
+
+LEE. (2022). R Extract first two characters from a column in a dataframe. *Stackoverflow* https://stackoverflow.com/questions/72408598/r-extract-first-two-characters-from-a-column-in-a-dataframe
+
+Yu, G. (2022). *Data Integration, Manipulation and Visualization of Phylogenetic Trees.* CRC Press. https://yulab-smu.top/treedata-book/chapter2.html
