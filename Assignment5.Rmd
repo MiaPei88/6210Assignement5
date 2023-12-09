@@ -11,11 +11,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Introduction
 
-Molecular Phylogenetics and Congruence
+The evolution of nuclear genes is generally slower than that of mitochondrial genes which can differ their phylogenetic trees(Lin & Danforth, 2004). Because of this, researchers often estimate phylogenetic relationship based on both of these genes for more accurate result. However, research about the discordance between different mitochondrial-gene trees are relatively limited. 
+
+COI (Cytochrome Oxidase I) and CytB (Cytochrome b) are both mitochondrial genes that are commonly used for phylogenetic studies, species identification, and evolutionary biology in birds. Whereas, the evolutionary rates between these two genes are different across more than 300 species in avian orders: COI evolves 14% slower than CytB on average (Lavinia et al., 2016). This means choosing different marker mitochondrial genes can also make the estimated phylogenetic trees vary.  
+
+To further explore the discordance of COI-gene trees and CytB-gene trees in a specific genera of bird, I use COI and CytB sequences data sets of *Acipenser* which are downloaded from NCBI and apply functions from packages such as "DECIPHER", "ape", and "dendextend" to make a tanglegram for examining topological congruence between the two phylogenetic trees draw from COI and CytB data sets.
 
 ### Description of Data Set
 
-The data set I choose for this project is the DNA sequences of COI gene and CytB gene in *Acipenser* from NCBI, and this data set is obtained on December 3, 2023. COI and CytB genes are widely used as phylogenetic markers of fish(Ivanova et al., 2007; Li et al., 2018). Here I use rentrez package and functions in Entrez_Functions.R, a course material, to obtain the data in this R script. I also limited the sequence lengths of the two genes to exclude whole genome sequences: the range of sequence length is 500-700 for COI gene and is 600-1200 for CytB gene. 
+The data set I choose for this project is the DNA sequences of COI gene and CytB gene in *Acipenser* from NCBI, and this data set is obtained on December 3, 2023. Here I use rentrez package and functions in Entrez_Functions.R, a course material, to obtain the data in this R script. I also limited the sequence lengths of the two genes to exclude whole genome sequences: the range of sequence length is 500-700 for COI gene and is 600-1200 for CytB gene. 
 
 ### Code Section 1 - – Data Acquisition, Exploration, Filtering, and Quality Control
 
@@ -24,11 +28,10 @@ Loading packages in this project.
 library(tidyverse)
 library(rentrez)
 library(Biostrings)
-library(ggplot2)
+library(ggtree)
 library(DECIPHER)
 library(ape)
 library(dendextend)
-library(phangorn)
 ```
 
 Search for the hits of COI and CytB gene of *Acipenser*.
@@ -123,7 +126,7 @@ Alignment <- function(filtered_df) {
                            sep = " ")
   names(df$nucleotides) <- df$Alignment_id
   alignment <- AlignSeqs(df$nucleotides)
-  return(dnaalignment)
+  return(alignment)
 }
 
 dfCOI.alignment.test <- Alignment(dfCOI_filtered)
@@ -138,7 +141,7 @@ Here I filtered out the sequences and then write another function for aligning s
 dfCOI_filtered1 <- dfCOI_filtered %>%
   filter(!grepl('ON097839.1|MT455724.1|MK903722.1|MK903723.1|MK903724.1|MK903725.1|MK903726.1|HM902200.1|MF122058.1|MF122059.1|KC578836.1|KC578837.1|KF929572.1|KF558304.1|KC500133.1|KC578827.1|EU523886.1|EU523878.1|KM286430.1|JQ623904.1|JQ623905.1|JQ623906.1|KX145481.1|KX145032.1|KC500105.1', Title))
 
-AlignTranslation <- function(filtered_df) {
+Translation_Alignment <- function(filtered_df) {
   df <- as.data.frame(filtered_df)
   df$nucleotides <- DNAStringSet(df$Sequence)
   df$Alignment_id <- paste(word(df$Species_Name, 2L), 
@@ -146,13 +149,12 @@ AlignTranslation <- function(filtered_df) {
                                   sep = " ")
   names(df$nucleotides) <- df$Alignment_id
   align.translation <- AlignTranslation(df$nucleotides, 
-                                             readingFrame=NA,
-                                             # AAStringSet: Amino Acid StringSet
-                                             type="AAStringSet")
+                                        # AAStringSet: Amino Acid StringSet
+                                        type="AAStringSet")
   return(align.translation)
 }
 
-dfCOI.translation <- AlignTranslation(dfCOI_filtered1)
+dfCOI.translation <- Translation_Alignment(dfCOI_filtered1)
 BrowseSeqs(dfCOI.translation)
 ```
 
@@ -184,7 +186,7 @@ Here I filtered out the sequences and then use the function "AlignTranslationTes
 dfCytB_filtered1 <- dfCytB_filtered %>%
   filter(!grepl('FJ974042.1|AJ249693.1|AJ249694.1|FJ974041.1', Title))
 
-dfCytB.translation <- AlignTranslationt(dfCytB_filtered1)
+dfCytB.translation <- Translation_Alignment(dfCytB_filtered1)
 
 BrowseSeqs(dfCytB.translation)
 ```
@@ -213,14 +215,14 @@ dfCytB_final <- dfCytB_filtered2 %>%
   filter(Species_Name %in% common_species)
 ```
 
-I write and use the function "DendrogramCheck" for making dendrograms to see the quality of data filtering for COI and CytB gene sequences.
+I write and use the function "Dendrogram" for making dendrograms to see the quality of data filtering for COI and CytB gene sequences.
 ```{r}
-DendrogramCheck <- function(filtered_df, clustering_method, clustering_threshold) {
+Dendrogram <- function(filtered_df, clustering_method) {
   df <- as.data.frame(filtered_df)
   df$nucleotides <- DNAStringSet(df$Sequence)
   # I only used the first to letters of the second word in the column Species_Name
   # and the number of each sequence which is the first word in the column Title
-  df$Alignment_id <- paste(substr(word(df$Species_Name, 2L),1,2), word(df$Title, 1L), sep = " ")
+  df$Alignment_id <- word(df$Title, 1L)
   names(df$nucleotides) <- df$Alignment_id
   df <- AlignSeqs(df$nucleotides)
   dnaBin <- as.DNAbin(df)
@@ -229,25 +231,34 @@ DendrogramCheck <- function(filtered_df, clustering_method, clustering_threshold
                            as.matrix = TRUE, pairwise.deletion = TRUE)
   clusters <- DECIPHER::TreeLine(myDistMatrix = distanceMatrix,
                                  method = clustering_method,
-                                 cutoff = clustering_threshold,
                                  collapse = -1,
-                                 showPlot = TRUE,
+                                 showPlot = FALSE,
                                  type = "both",
                                  verbose = FALSE)
   return(clusters)
 }
 ```
 
-```{r, fig.align = 'center', fig.cap = '**Figure 3**: Phylogenetic tree of all sequences belongs to COI gene marker'}
-clusters.COI <- DendrogramCheck(dfCOI_final, "NJ", 0.016)
+```{r, results='hide', fig.align = 'center', fig.cap = '**Figure 3**: Phylogenetic tree of all sequences belongs to COI gene marker'}
+clusters.COI <- Dendrogram(dfCOI_final, "NJ")
+COI.testtree <- as.phylo(clusters.COI[[2]])
+
+
+
+ggtree(COI.testtree, layout="circular") + 
+  geom_tiplab(size=2, aes(angle=angle), color='blue')
 ```
 
-```{r, fig.align = 'center', fig.cap = '**Figure 4**: Phylogenetic tree of all sequences belongs to CytB gene marker'}
-clusters.CytB <- DendrogramCheck(dfCytB_final, "NJ", 0.016)
+```{r, results='hide', fig.align = 'center', fig.cap = '**Figure 4**: Phylogenetic tree of all sequences belongs to CytB gene marker'}
+clusters.CytB <- Dendrogram(dfCytB_final, "NJ")
+CytB.testtree <- as.phylo(clusters.CytB[[2]])
+ggtree(CytB.testtree, layout="circular") + 
+  geom_tiplab(size=1.8, aes(angle=angle), color='purple')
 ```
 
 ### Main Software Tools Description
 
+For the main analysis, I choose package "dendextend" (Galili, 2015) as the main software tool to make comparison between the two phylogenetic trees using sequences from COI and CytB markers. It is easy to understand how to use the package for making tanglegram and the code block can be tidy and short. I also considered using "phytools" but after comparing the vignettes of these two packages, I found "dendextend" can give the figure I want with less coding and better visualization. The biggest disadvantages of this tool are limited functions to change the tip labels of Neighbour Joining trees. I cannot make the labels lining up neatly as a column. Besides, I can only change the font size to see all the labels otherwise the longest label can only be shown partly. 
 
 ### Code Section 2 - Main Analysis
 
@@ -288,22 +299,80 @@ COI_represent <- FindRepSeq(clusters.COI[[2]],dfCOI_final)
 CytB_represent <- FindRepSeq(clusters.CytB[[2]],dfCytB_final)
 ```
 
+Making new dendrograms on species level for creating the tanglegram to compare these two next.
+```{r, results='hide'}
+# COI representative sequences alignment and making dendrogram
+dfCOI_represent <- as.data.frame(COI_represent)
+dfCOI_represent$nucleotides <- DNAStringSet(dfCOI_represent$Sequence)
+# I use the Species_Name here as the names for the alignment
+names(dfCOI_represent$nucleotides) <- word(dfCOI_represent$Species_Name, 2L)
+dfCOI_rep_alignment <- AlignSeqs(dfCOI_represent$nucleotides)
+COI_dnaBin <- as.DNAbin(dfCOI_rep_alignment)
+COI_distanceMatrix <- dist.dna(COI_dnaBin, model = "TN93", 
+                           as.matrix = TRUE, pairwise.deletion = TRUE)
+COI_rep_clusters <- DECIPHER::TreeLine(myDistMatrix = COI_distanceMatrix,
+                                 method = "NJ",
+                                 collapse = -1,
+                                 showPlot = FALSE,
+                                 type = "both",
+                                 verbose = FALSE)
 
+# CytB representative sequences alignment and making dendrogram
+dfCytB_represent <- as.data.frame(CytB_represent)
+dfCytB_represent$nucleotides <- DNAStringSet(dfCytB_represent$Sequence)
+names(dfCytB_represent$nucleotides) <- word(dfCytB_represent$Species_Name, 2L)
+dfCytB_rep_alignment <- AlignSeqs(dfCytB_represent$nucleotides)
+CytB_dnaBin <- as.DNAbin(dfCytB_rep_alignment)
+CytB_distanceMatrix <- dist.dna(CytB_dnaBin, model = "TN93", 
+                           as.matrix = TRUE, pairwise.deletion = TRUE)
+CytB_rep_clusters <- DECIPHER::TreeLine(myDistMatrix = CytB_distanceMatrix,
+                                 method = "NJ",
+                                 collapse = -1,
+                                 showPlot = FALSE,
+                                 type = "both",
+                                 verbose = FALSE)
+```
+
+Making the tanglegram to compare the two trees.
+```{r, fig.align = 'center', fig.cap = '**Figure 5**: This is a tanglergram Comparing the Differences between Two Phylogenetic Trees Made from COI and CytB Markers. The connecting line between two trees are based on the common subtrees of both dendrograms. Distinct branches are marked with a dashed line.'}
+# Save the two dendrograms into two vectors
+dend_COI <- COI_rep_clusters[[2]]
+dend_CytB <- CytB_rep_clusters[[2]]
+# Save the two vectors into a dendlist
+dl <- dendlist(dend_COI, dend_CytB)
+# Create the tanglegram
+tanglegram(dl, cex_main = 1, 
+           # Name the two trees with the two markers
+           main_left = "COI Clustering", 
+           main_right = "CytB Clustering", 
+           # Change label font
+           lab.cex = 0.6, 
+           # Change columns width, first column(COI Clustering) as 4
+           # and third column (CytB Clustering) as 6 to match the scale bars
+           # for better visualization
+           columns_width = c(4,3,6),
+           highlight_branches_lwd = FALSE)
+```
 
 ### Results and Discussion
 
+Return to your original question. What is the answer to your question? What did you discover? Were your results as expected or not?
+
+Briefly describe any key caveats of your study. For example, are the conclusions that can be drawn limited by sample size or any other concerns? Were there biases in data availability that could have impacted your project?
+
+What would be the next steps for this research? What would you do next if you had more time and if you were going to develop this work into a larger project? Did your results reveal any interesting preliminary findings that would be worthy of follow-up study?
 
 ### Reflection
 
 
-### Acknowledgements
-
 
 ### References
 
-Ivanova, N. V., Zemlak, T. S., Hanner, R. H., & Hebert, P. D. (2007). Universal primer cocktails for fish DNA barcoding. *Molecular Ecology Notes*, 7(4), 544-548.
+Galili, T. (2015). dendextend: an R package for visualizing, adjusting and comparing trees of hierarchical clustering. Bioinformatics, 31(22), 3718-3720.
 
-Li, X., Shen, X., Chen, X., Xiang, D., Murphy, R. W., & Shen, Y. (2018). Detection of potential problematic Cytb gene sequences of fishes in GenBank. *Frontiers in genetics*, 9, 30.
+Lavinia, P. D., Kerr, K. C., Tubaro, P. L., Hebert, P. D., & Lijtmaer, D. A. (2016). Calibrating the molecular clock beyond cytochrome b: assessing the evolutionary rate of COI in birds. Journal of Avian Biology, 47(1), 84-91.
+
+Lin, C. P., & Danforth, B. N. (2004). How do insect nuclear and mitochondrial gene substitution patterns differ? Insights from Bayesian analyses of combined datasets. Molecular phylogenetics and evolution, 30(3), 686-702.
 
 LEE. (2022). R Extract first two characters from a column in a dataframe. *Stackoverflow* https://stackoverflow.com/questions/72408598/r-extract-first-two-characters-from-a-column-in-a-dataframe
 
