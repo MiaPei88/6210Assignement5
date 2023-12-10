@@ -1,8 +1,10 @@
 ---
 title: "Assignment 5"
-author: "Qingyuan Pei [Jump to Github](https://github.com/MiaPei88/BINF6210-Assignement5)"
+author: "Qingyuan Pei [(Github)](https://github.com/MiaPei88/BINF6210-Assignement5)"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -17,9 +19,11 @@ COI (Cytochrome Oxidase I) and CytB (Cytochrome b) are both mitochondrial genes 
 
 To further explore the discordance of COI-gene trees and CytB-gene trees in a specific genera of bird, I use COI and CytB sequences data sets of *Acipenser* which are downloaded from NCBI and apply functions from packages such as "DECIPHER", "ape", and "dendextend" to make a tanglegram for examining topological congruence between the two phylogenetic trees draw from COI and CytB data sets.
 
+
 ### Description of Data Set
 
 The data set I choose for this project is the DNA sequences of COI gene and CytB gene in *Acipenser* from NCBI, and this data set is obtained on December 3, 2023. Here I use rentrez package and functions in Entrez_Functions.R, a course material, to obtain the data in this R script. I also limited the sequence lengths of the two genes to exclude whole genome sequences: the range of sequence length is 500-700 for COI gene and is 600-1200 for CytB gene. 
+
 
 ### Code Section 1 - – Data Acquisition, Exploration, Filtering, and Quality Control
 
@@ -32,8 +36,10 @@ library(ggtree)
 library(DECIPHER)
 library(ape)
 library(dendextend)
+library(phytools)
 ```
 
+\newpage
 Search for the hits of COI and CytB gene of *Acipenser*.
 ```{r}
 NCBI_search <- entrez_search(
@@ -78,22 +84,24 @@ Filter1 <- function(df) {
 dfCOI <- Filter1(dfNCBI_COI) 
 dfCytB <- Filter1(dfNCBI_CytB) 
 ```
-
+\newpage
 Draw a histogram to see the distribution of COI sequence lengths to further decide the following data filtering steps.
-```{r, fig.align = 'center', fig.cap = '**Figure 1**: '}
+```{r, fig.align = 'center', fig.cap = 'The majority of COI sequences distributes around nucleotides in length.'}
 hist((dfCOI$Sequence_Length), 
      xlab = "Sequence Length", 
      ylab =  "Frequency", 
      main = "Distribution of COI Sequence Lengths")
 ```
 
+\newpage
 Draw a histogram to see the distribution of CytB sequence lengths to further decide the following data filtering steps.
-```{r, fig.align = 'center', fig.cap = '**Figure 2**: '}
+```{r, fig.align = 'center', fig.cap = 'The majority of CytB sequences distributes around the median of nucleotides in length.'}
 hist((dfCytB$Sequence_Length), 
      xlab = "Sequence Length", 
      ylab =  "Frequency", 
      main = "Distribution of CytB Sequence Lengths")
 ```
+
 
 Filter out sequences that their length are not the majority.
 ```{r}
@@ -106,7 +114,7 @@ dfCytB_filtered <- dfCytB %>%
   filter(Sequence_Length >= median((Sequence_Length) - 100) & 
            Sequence_Length <= median((Sequence_Length) + 100))
 ```
-
+\newpage
 Check if the number of species between 10 to 50.
 ```{r}
 length(unique(dfCOI$Species_Name))
@@ -137,7 +145,7 @@ After seeing the alignment result, I decided to delete the sequences that are hi
 ON097839.1, MT455724.1, MK903722.1, MK903723.1, MK903724.1, MK903725.1, MK903726.1, HM902200.1, MF122058.1, MF122059.1, KC578836.1, KC578837.1, KF929572.1, KF558304.1, KC500133.1, KC578827.1, EU523886.1, EU523878.1, KM286430.1, JQ623904.1, JQ623905.1, JQ623906.1, KX145481.1, KX145032.1, KC500105.1 
 
 Here I filtered out the sequences and then write another function for aligning sequences by their amino acid translation, in order to filter outliers that might be missed in the last step.
-```{r, results='hide'}
+```{r, results='hide', tidy=TRUE}
 dfCOI_filtered1 <- dfCOI_filtered %>%
   filter(!grepl('ON097839.1|MT455724.1|MK903722.1|MK903723.1|MK903724.1|MK903725.1|MK903726.1|HM902200.1|MF122058.1|MF122059.1|KC578836.1|KC578837.1|KF929572.1|KF558304.1|KC500133.1|KC578827.1|EU523886.1|EU523878.1|KM286430.1|JQ623904.1|JQ623905.1|JQ623906.1|KX145481.1|KX145032.1|KC500105.1', Title))
 
@@ -162,7 +170,7 @@ After seeing the Amino Acid alignment, I decide to delete sequences that are cle
 ON097800.1, ON097762.1, ON097679.1, MT455123.1, KX145047.1, MG648396.1, MG648380.1, MG648371.1, MG648367.1, MG648366.1, KX145047.1, GQ328798.1, GQ328790.1, HQ960593.1, KC500103.1, FJ809729.1, FJ809728.1, FJ809727.1, FJ809726.1, FJ809725.1, FJ809722.1, HQ960593.1, HQ960592.1, HQ960591.1, HQ960590.1
 
 Here I filter out the sequences then write another function for making a dendrogram to see the quality of data filtering.
-```{r, results='hide'}
+```{r, results='hide', tidy=TRUE}
 dfCOI_filtered2 <- dfCOI_filtered1 %>%
   filter(
     !grepl('ON097800.1|ON097762.1|ON097679.1|MT455123.1|KX145047.1|MG648396.1|MG648380.1|MG648371.1|MG648367.1|MG648366.1|KX145047.1|GQ328798.1|GQ328790.1|HQ960593.1|KC500103.1|FJ809729.1|FJ809728.1|FJ809727.1|FJ809726.1|FJ809725.1|FJ809722.1|HQ960593.1|HQ960592.1|HQ960591.1|HQ960590.1', Title))
@@ -197,13 +205,13 @@ Here I filter out the sequences and check the number of species for CytB gene
 ```{r, results='hide'}
 dfCytB_filtered2 <- dfCytB_filtered1 %>%
   filter(!grepl('FJ974040.1|AJ277594.1|FJ974043.1', Title))
-
-unique(dfCytB_filtered2$Species_Name)
 ```
 
 After all the data filtering steps I need to see the common species between COI and CytB groups and filter out other species that are not shared by these two marker genes.
 ```{r}
-common_species <- intersect(dfCOI_filtered2$Species_Name, dfCytB_filtered2$Species_Name)
+common_species <- intersect(dfCOI_filtered2$Species_Name, 
+                            dfCytB_filtered2$Species_Name)
+length(common_species)
 ```
 
 Filter out other species that are not shared by both COI and CytB group.
@@ -222,7 +230,9 @@ Dendrogram <- function(filtered_df, clustering_method) {
   df$nucleotides <- DNAStringSet(df$Sequence)
   # I only used the first to letters of the second word in the column Species_Name
   # and the number of each sequence which is the first word in the column Title
-  df$Alignment_id <- word(df$Title, 1L)
+  df$Alignment_id <- paste(substr(word(df$Species_Name, 2L), 1, 2), 
+                           word(df$Title, 1L), 
+                           sep = " ")
   names(df$nucleotides) <- df$Alignment_id
   df <- AlignSeqs(df$nucleotides)
   dnaBin <- as.DNAbin(df)
@@ -238,27 +248,31 @@ Dendrogram <- function(filtered_df, clustering_method) {
   return(clusters)
 }
 ```
-
-```{r, results='hide', fig.align = 'center', fig.cap = '**Figure 3**: Phylogenetic tree of all sequences belongs to COI gene marker'}
+\newpage
+I use the package "ggtree" to make the phylogenetic tree of all the sequences from COI after data filtering and sequence alignment to check if there are still outliers. The number of sequences of my data is are too big to show a clear dendogram with all the labels seperate by using TreeLine function from DECIPHER. Therefore I decided to use ggtree to change the layout into circular for better showing the labels. 
+```{r, results='hide', fig.align = 'center', fig.cap = 'Phylogenetic tree of all sequences belongs to COI gene marker'}
 clusters.COI <- Dendrogram(dfCOI_final, "NJ")
 COI.testtree <- as.phylo(clusters.COI[[2]])
-
-
 
 ggtree(COI.testtree, layout="circular") + 
   geom_tiplab(size=2, aes(angle=angle), color='blue')
 ```
-
-```{r, results='hide', fig.align = 'center', fig.cap = '**Figure 4**: Phylogenetic tree of all sequences belongs to CytB gene marker'}
+\newpage
+Draw a phylogenetic tree of all the sequences from CytB after data filtering and sequence alignment to check if there are still outliers.
+```{r, results='hide', fig.align = 'center', fig.cap = 'Phylogenetic tree of all sequences belongs to CytB gene marker'}
 clusters.CytB <- Dendrogram(dfCytB_final, "NJ")
 CytB.testtree <- as.phylo(clusters.CytB[[2]])
 ggtree(CytB.testtree, layout="circular") + 
   geom_tiplab(size=1.8, aes(angle=angle), color='purple')
 ```
 
+
+
+
 ### Main Software Tools Description
 
-For the main analysis, I choose package "dendextend" (Galili, 2015) as the main software tool to make comparison between the two phylogenetic trees using sequences from COI and CytB markers. It is easy to understand how to use the package for making tanglegram and the code block can be tidy and short. I also considered using "phytools" but after comparing the vignettes of these two packages, I found "dendextend" can give the figure I want with less coding and better visualization. The biggest disadvantages of this tool are limited functions to change the tip labels of Neighbour Joining trees. I cannot make the labels lining up neatly as a column. Besides, I can only change the font size to see all the labels otherwise the longest label can only be shown partly. 
+For the main analysis, I choose package "dendextend" (Galili, 2015) as the main software tool to make comparison between the two phylogenetic trees using sequences from COI and CytB markers. It is easy to understand how to use the package for making tanglegram and the code block can be tidy and short. I also used "phytools" to compare the ouputs between the two packages and I found "dendextend" can give the figure I want with less coding and better visualization. The tanglegram made by "phytools" are without scale bar if users do not use "scale.bar" when ploting it. Even if the scale bars are added, this is still not meaningful because the two trees are rescaled internally before plotting in the "cophylo" function. However, there are still some disadvantages in "dendextend": the limited functions to change the tip labels of Neighbour Joining trees. To be more specific, I cannot make the labels lining up neatly as a column. Besides, I can only change the font size to see all the labels otherwise the longest label can only be shown partly. 
+
 
 ### Code Section 2 - Main Analysis
 
@@ -274,6 +288,8 @@ FindRepSeq <- function(dendrogram, df_final) {
   parent.median <- treetibble %>%
     group_by(species) %>%
     summarize(Median = round(median(parent)))
+  # Set seed for making the result reproducible
+  set.seed(137)
   # Choose one sequence with the median parent node number to be the representative
   rep.sequences <- treetibble %>%
     group_by(species) %>%
@@ -333,8 +349,8 @@ CytB_rep_clusters <- DECIPHER::TreeLine(myDistMatrix = CytB_distanceMatrix,
                                  verbose = FALSE)
 ```
 
-Making the tanglegram to compare the two trees.
-```{r, fig.align = 'center', fig.cap = '**Figure 5**: This is a tanglergram Comparing the Differences between Two Phylogenetic Trees Made from COI and CytB Markers. The connecting line between two trees are based on the common subtrees of both dendrograms. Distinct branches are marked with a dashed line.'}
+Making the tanglegram to compare the two trees using package "dendextend".
+```{r, fig.align = 'center', fig.cap = 'This is a Tanglergram Comparing the Differences between Two Phylogenetic Trees Made from COI and CytB Markers (by package "dendextend"). The connecting line between two trees are based on the common subtrees of both dendrograms. Distinct branches are marked with a dashed line.'}
 # Save the two dendrograms into two vectors
 dend_COI <- COI_rep_clusters[[2]]
 dend_CytB <- CytB_rep_clusters[[2]]
@@ -353,27 +369,45 @@ tanglegram(dl, cex_main = 1,
            columns_width = c(4,3,6),
            highlight_branches_lwd = FALSE)
 ```
+\newpage
+Making the tanglegram to compare the two trees using package "phytools".
+```{r, results='hide', fig.align = 'center', fig.cap = 'This is a Tanglergram Comparing the Differences between Two Phylogenetic Trees Made from COI and CytB Markers (by package "phytools"). The connecting line between two trees are based on the common subtrees of both dendrograms.'}
+# Convert the dendrograms of COI and CytB into phylo for using phytools
+COI_phylo <- as.phylo(COI_rep_clusters[[2]])
+CytB_phylo <- as.phylo(CytB_rep_clusters[[2]])
+# Making cophylo tree
+obj <- cophylo(COI_phylo, CytB_phylo, rotate = FALSE, print = TRUE)
+# Plot the tree
+plot(obj, link.type="curved", link.lwd=3, link.lty = "solid", 
+     link.col = make.transparent("blue",0.25), fsize = 0.8)
+```
+
 
 ### Results and Discussion
 
-Return to your original question. What is the answer to your question? What did you discover? Were your results as expected or not?
+After visualizing the comparison between the two phylogenetic trees made from COI gene and CytB gene, the differences do exist in this project. This further strengthens the research finding that evolutionary rates between COI and CytB genes vary. However, this result is also possible to be induced by the the difference in the number of sequences between the same species of different gene markers (Dinh et al., 2019). For example, the relationships among *Acipenser stellatus*, *Acipenser ruthenus*, and *Acipenser nudiventris* differ in the trees from two marker genes. Comparing to the sample sizes of these three species from COI gene, those from CytB gene are significantly unbalanced. The number of sequences of *A. stellatus* is much bigger than it of *A. ruthenus* and there is only one sequence of *A. nudiventris*. The similar situation also exists on the data sets of *Acipenser persicus* and *Acipenser gueldenstaedtii*.
 
-Briefly describe any key caveats of your study. For example, are the conclusions that can be drawn limited by sample size or any other concerns? Were there biases in data availability that could have impacted your project?
-
-What would be the next steps for this research? What would you do next if you had more time and if you were going to develop this work into a larger project? Did your results reveal any interesting preliminary findings that would be worthy of follow-up study?
-
-### Reflection
-
+Considering the limited time for finishing this research project, there are still many improvements can be made for more reliable results.  The first step can be added is getting more DNA sequence data from other public data bases. Then conducting a model test to find the best model for the specific data set in this project by phangorn or other tools outside R environmennt, such as ModelTest-NG (Darriba et al., 2020). Checking if the clustering algorithm in this project is appropriate can also be added by applying correlation calculations (Güell et al., 2017).
 
 
 ### References
 
-Galili, T. (2015). dendextend: an R package for visualizing, adjusting and comparing trees of hierarchical clustering. Bioinformatics, 31(22), 3718-3720.
+Darriba, D., Posada, D., Kozlov, A. M., Stamatakis, A., Morel, B., & Flouri, T. (2020). ModelTest-NG: a new and scalable tool for the selection of DNA and protein evolutionary models. *Molecular biology and evolution*, 37(1), 291-294.
 
-Lavinia, P. D., Kerr, K. C., Tubaro, P. L., Hebert, P. D., & Lijtmaer, D. A. (2016). Calibrating the molecular clock beyond cytochrome b: assessing the evolutionary rate of COI in birds. Journal of Avian Biology, 47(1), 84-91.
+Dinh, T. D., Ngatia, J. N., Cui, L. Y., Ma, Y., Dhamer, T. D., & Xu, Y. C. (2019). Influence of pairwise genetic distance computation and reference sample size on the reliability of species identification using Cyt b and COI gene fragments in a group of native passerines. *Forensic Science International: Genetics*, 40, 85-95.
 
-Lin, C. P., & Danforth, B. N. (2004). How do insect nuclear and mitochondrial gene substitution patterns differ? Insights from Bayesian analyses of combined datasets. Molecular phylogenetics and evolution, 30(3), 686-702.
+Galili, T. (2015). dendextend: an R package for visualizing, adjusting and comparing trees of hierarchical clustering. *Bioinformatics*, 31(22), 3718-3720.
+
+Lavinia, P. D., Kerr, K. C., Tubaro, P. L., Hebert, P. D., & Lijtmaer, D. A. (2016). Calibrating the molecular clock beyond cytochrome b: assessing the evolutionary rate of COI in birds. *Journal of Avian Biology*, 47(1), 84-91.
+
+Lin, C. P., & Danforth, B. N. (2004). How do insect nuclear and mitochondrial gene substitution patterns differ? Insights from Bayesian analyses of combined datasets. *Molecular phylogenetics and evolution*, 30(3), 686-702.
+
+Güell, B, Antos, D, Muratore, I., & Schmitt, C. A. (2017). Module 24: An Intro to Phylogenetic Tree Construction in R.  https://fuzzyatelin.github.io/bioanth-stats/module-24/module-24.html
+
+Galil, T. (2023). Introduction to dendextend. https://cran.r-project.org/web/packages/dendextend/vignettes/dendextend.html
 
 LEE. (2022). R Extract first two characters from a column in a dataframe. *Stackoverflow* https://stackoverflow.com/questions/72408598/r-extract-first-two-characters-from-a-column-in-a-dataframe
 
-Yu, G. (2022). *Data Integration, Manipulation and Visualization of Phylogenetic Trees.* CRC Press. https://yulab-smu.top/treedata-book/chapter2.html
+Revell, L. (2017). Plotting methods for phylogenies & comparative data in R. *Phylogenetic Tools for Comparative Biology* http://www.phytools.org/Cordoba2017/ex/15/Plotting-methods.html
+
+Yu, G. (2022). Data Integration, Manipulation and Visualization of Phylogenetic Trees. *CRC Press*. https://yulab-smu.top/treedata-book/chapter2.html
